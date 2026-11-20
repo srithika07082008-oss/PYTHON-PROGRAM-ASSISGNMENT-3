@@ -1,0 +1,62 @@
+import random
+import time
+import sys
+
+def valid(c):
+    return -50 <= c <= 50
+
+def convert(c):
+    return c * 9 / 5 + 32
+
+def clean_loop(readings):
+    celsius, fahrenheit = [], []
+    for c in readings:
+        if valid(c):
+            celsius.append(c)
+            fahrenheit.append(convert(c))
+    return celsius, fahrenheit
+
+def clean_comprehension(readings):
+    celsius = [c for c in readings if valid(c)]
+    fahrenheit = [convert(c) for c in readings if valid(c)]
+    return celsius, fahrenheit
+
+def clean_map_filter(readings):
+    valid_values = list(filter(lambda c: valid(c), readings))
+    fahrenheit = list(map(lambda c: convert(c), valid_values))
+    return valid_values, fahrenheit
+
+def alarm_minutes(readings):
+    return [minute for minute, c in enumerate(readings, start=1)
+            if valid(c) and not (2 <= c <= 8)]
+
+if __name__ == "__main__":
+    readings = [4.0, 7.5, 9.0, 55.0, -60.0, 1.0, 5.0, 8.5]
+    a = clean_loop(readings)
+    b = clean_comprehension(readings)
+    c = clean_map_filter(readings)
+    print("Loop:", a)
+    print("Comprehension:", b)
+    print("map/filter:", c)
+    print("Alarm minutes:", alarm_minutes(readings))
+    assert a == b == c
+
+    # Compare time and memory at the requested scales.
+    for n in (10_000, 100_000, 1_000_000):
+        data = [random.uniform(-60, 60) for _ in range(n)]
+        for label, function in (
+            ("loop", clean_loop),
+            ("comprehension", clean_comprehension),
+            ("map/filter", clean_map_filter)
+        ):
+            t0 = time.perf_counter()
+            output = function(data)
+            elapsed = time.perf_counter() - t0
+            print(n, label, f"{elapsed:.6f}s", "valid:", len(output[0]))
+        comp = [x for x in data if valid(x)]
+        gen = (x for x in data if valid(x))
+        print("container sizes:", sys.getsizeof(comp), sys.getsizeof(gen))
+        assert comp == list(gen)
+
+    print("all valid:", clean_comprehension([2, 3, 4]))
+    print("all invalid:", clean_comprehension([51, -51, 100]))
