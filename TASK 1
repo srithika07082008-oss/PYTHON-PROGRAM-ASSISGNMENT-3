@@ -1,0 +1,63 @@
+import random
+import time
+
+def rainfall_report(readings):
+    if not readings:
+        print("No rainfall readings.")
+        return
+
+    weekly_totals = [sum(readings[i:i+7])
+                     for i in range(0, len(readings), 7)]
+    wettest = max(readings)
+    driest = min(readings)
+    wet_days = [i + 1 for i, x in enumerate(readings) if x == wettest]
+    dry_days_min = [i + 1 for i, x in enumerate(readings) if x == driest]
+    dry_days_zero = [i + 1 for i, x in enumerate(readings) if x == 0]
+
+    # Naive method: sums each 7-value window again.
+    naive = [sum(readings[i:i+7]) / 7
+             for i in range(len(readings) - 6)]
+
+    # Running-sum method: update the previous window total.
+    running = []
+    if len(readings) >= 7:
+        window_sum = sum(readings[:7])
+        running.append(window_sum / 7)
+        for i in range(7, len(readings)):
+            window_sum += readings[i] - readings[i-7]
+            running.append(window_sum / 7)
+
+    print("Number of readings:", len(readings))
+    print("Weekly totals (last week may contain fewer than 7 days):", weekly_totals)
+    print("Maximum rainfall:", wettest, "mm; day(s):", wet_days)
+    print("Minimum rainfall:", driest, "mm; day(s):", dry_days_min)
+    print("Zero-rainfall days:", dry_days_zero)
+    print("First five 7-day averages:", running[:5])
+    assert naive == running
+
+def benchmark(n):
+    data = [random.uniform(0, 100) for _ in range(n)]
+    t0 = time.perf_counter()
+    naive = [sum(data[i:i+7]) / 7 for i in range(max(0, n-6))]
+    naive_time = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    running = []
+    if n >= 7:
+        s = sum(data[:7])
+        running.append(s / 7)
+        for i in range(7, n):
+            s += data[i] - data[i-7]
+            running.append(s / 7)
+    running_time = time.perf_counter() - t0
+    print(f"n={n}: naive={naive_time:.6f}s, running-sum={running_time:.6f}s")
+    assert len(naive) == len(running)
+
+if __name__ == "__main__":
+    random.seed(10)
+    readings = [random.randint(0, 100) for _ in range(365)]
+    rainfall_report(readings)
+    for size in (365, 36500, 365000):
+        benchmark(size)
+    rainfall_report([])
+    rainfall_report([0, 2, 4])
