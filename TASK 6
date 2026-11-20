@@ -1,0 +1,109 @@
+from collections import defaultdict
+import random
+import time
+
+timetable = {
+    "12601": {
+        "name": "Chennai Express",
+        "stops": [
+            ("Chennai", "06:00", "06:15"),
+            ("Vijayawada", "12:00", "12:05"),
+            ("Warangal", "15:00", "15:05"),
+            ("Nagpur", "20:00", "20:10")
+        ],
+        "days": {"Mon", "Wed", "Fri"}
+    },
+    "12602": {
+        "name": "Coastal Express",
+        "stops": [
+            ("Chennai", "07:00", "07:10"),
+            ("Nellore", "09:00", "09:05"),
+            ("Vijayawada", "12:30", "12:40")
+        ],
+        "days": {"Tue", "Thu", "Sat"}
+    },
+    "12603": {
+        "name": "City Intercity",
+        "stops": [
+            ("Bengaluru", "05:30", "05:40"),
+            ("Katpadi", "08:00", "08:05"),
+            ("Chennai", "10:30", "10:45")
+        ],
+        "days": {"Mon", "Tue", "Wed", "Thu", "Fri"}
+    },
+    "12604": {
+        "name": "Southern Mail",
+        "stops": [
+            ("Madurai", "06:15", "06:20"),
+            ("Trichy", "08:30", "08:35"),
+            ("Chennai", "13:00", "13:15")
+        ],
+        "days": {"Sun", "Tue", "Thu"}
+    },
+    "12605": {
+        "name": "Western Link",
+        "stops": [
+            ("Coimbatore", "06:00", "06:10"),
+            ("Salem", "08:00", "08:05"),
+            ("Katpadi", "11:00", "11:05"),
+            ("Chennai", "14:00", "14:10")
+        ],
+        "days": {"Mon", "Wed", "Sat"}
+    }
+}
+
+def trains_at_station(data, station, day):
+    result = []
+    for number, details in data.items():
+        if day in details["days"]:
+            for stop, arrival, departure in details["stops"]:
+                if stop.lower() == station.lower():
+                    result.append((number, details["name"], arrival, departure))
+    return result
+
+def sort_departures(trains):
+    return sorted(trains, key=lambda item: item[3])
+
+def build_station_index(data):
+    index = defaultdict(list)
+    for number, details in data.items():
+        for station, arrival, departure in details["stops"]:
+            index[station.lower()].append(number)
+    return dict(index)
+
+def print_timetable(data):
+    for number, details in data.items():
+        print(number, "-", details["name"], "| days:", sorted(details["days"]))
+        for station, arrival, departure in details["stops"]:
+            print("   ", station, arrival, departure)
+
+if __name__ == "__main__":
+    print_timetable(timetable)
+    print("Chennai trains on Monday:")
+    print(sort_departures(trains_at_station(timetable, "Chennai", "Mon")))
+    print("Third stop departure of 12601:",
+          timetable["12601"]["stops"][2][2])
+
+    index = build_station_index(timetable)
+    print("Station index:", index)
+    print("Unknown station:", index.get("unknown", []))
+
+    # Compare query scanning with indexed lookup on generated timetable data.
+    for n in (100, 1000, 10000):
+        data = {}
+        for i in range(n):
+            data[str(i)] = {
+                "name": f"Train {i}",
+                "stops": [(f"Station {j % 100}", "08:00", "08:05")
+                          for j in range(10)],
+                "days": {"Mon", "Wed"}
+            }
+        t0 = time.perf_counter()
+        scan = trains_at_station(data, "Station 5", "Mon")
+        scan_time = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        idx = build_station_index(data)
+        indexed = idx.get("station 5", [])
+        index_build_time = time.perf_counter() - t0
+        print(n, "scan:", scan_time, "index build:", index_build_time,
+              "indexed result count:", len(indexed))
