@@ -1,0 +1,63 @@
+import re
+import random
+import time
+from collections import Counter, defaultdict
+
+calls = [
+    "seeds not received seeds delayed",
+    "fertiliser price high",
+    "seeds price high subsidy not received"
+]
+STOP = {"not", "high"}
+
+def frequencies(texts, stop):
+    counts = {}
+    for text in texts:
+        words = re.findall(r"[a-z]+", text.lower())
+        for word in words:
+            if word not in stop:
+                counts[word] = counts.get(word, 0) + 1
+    return counts
+
+def group_by_district(records):
+    grouped = {}
+    for district, complaint in records:
+        grouped.setdefault(district, []).append(complaint)
+    return grouped
+
+def top(counts, k):
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:k]
+
+if __name__ == "__main__":
+    result = frequencies(calls, STOP)
+    print(top(result, 3))
+    records = [
+        ("Chennai", calls[0]),
+        ("Madurai", calls[1]),
+        ("Chennai", calls[2])
+    ]
+    print(group_by_district(records))
+    print("keys:", list(result.keys()))
+    print("values:", list(result.values()))
+    print("items:", list(result.items()))
+
+    # Experimental comparison with generated data
+    vocabulary = ["seed", "water", "loan", "crop", "price", "fertiliser"]
+    for n in (1000, 10000, 100000):
+        generated = [" ".join(random.choices(vocabulary, k=8)) for _ in range(n)]
+        words = [w for line in generated for w in line.split()]
+        t0 = time.perf_counter()
+        dict_counts = {}
+        for w in words:
+            dict_counts[w] = dict_counts.get(w, 0) + 1
+        dict_time = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        counter_counts = Counter(words)
+        counter_time = time.perf_counter() - t0
+
+        t0 = time.perf_counter()
+        list_counts = {w: words.count(w) for w in set(words)}
+        list_time = time.perf_counter() - t0
+        print(n, "dict:", dict_time, "Counter:", counter_time, "list.count:", list_time)
+        assert dict_counts == counter_counts == list_counts
