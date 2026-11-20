@@ -1,0 +1,84 @@
+import re
+import time
+
+def normalise_phone(value):
+    digits = re.sub(r"\D", "", value or "")
+    if digits.startswith("91") and len(digits) == 12:
+        digits = digits[2:]
+    return digits if len(digits) == 10 else ""
+
+def normalise_email(value):
+    value = (value or "").strip().lower()
+    return value if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value) else ""
+
+def normalise_name(value):
+    value = (value or "").strip().lower()
+    value = re.sub(r"^(dr|mr|mrs|ms)\.?\s+", "", value)
+    return re.sub(r"\s+", " ", value)
+
+def merge_contacts(sources):
+    merged = {}
+    phone_index = {}
+    email_index = {}
+    next_id = 1
+
+    for source in sources:
+        for record in source:
+            name = (record.get("name") or "").strip()
+            phones = {p for p in
+                      (normalise_phone(x) for x in record.get("phones", [])) if p}
+            emails = {e for e in
+                      (normalise_email(x) for x in record.get("emails", [])) if e}
+
+            # Find matching records using strong identifiers.
+            matches = {phone_index[p] for p in phones if p in phone_index}
+            matches.update(email_index[e] for e in emails if e in email_index)
+
+            if not matches:
+                cid = next_id
+                next_id += 1
+                merged[cid] = {
+                    "name": name,
+                    "phones": set(),
+                    "emails": set(),
+                    "aliases": set()
+                }
+            else:
+                cid = min(matches)
+                # If multiple existing records are connected, combine them.
+                for other in sorted(matches):
+                    if other != cid and other in merged:
+                        merged[cid]["phones"].update(merged[other]["phones"])
+                        merged[cid]["emails"].update(merged[other]["emails"])
+                        merged[cid]["aliases"].update(merged[other]["aliases"])
+                        if not merged[cid]["name"]:
+                            merged[cid]["name"] = merged[other]["name"]
+                        del merged[other]
+                        for p, owner in list(phone_index.items()):
+                            if owner == other:
+                                phone_index[p] = cid
+                        for e, owner in list(email_index.items()):
+                            if owner == other:
+                                email_index[e] = cid
+
+            item = merged[cid]
+            if name:
+                if not item["name"]:
+                    item["name"] = name
+                item["aliases"].add(name)
+            item["phones"].update(phones)
+            item["emails"].update(emails)
+
+            for p in phones:
+                phone_index[p] = cid
+            for e in emails:
+                email_index[e] = cid
+
+    # Present deterministic, readable output.
+    result = []
+    for item in merged.values():
+        result.append({
+            "name": item["name"] or "Unknown",
+            "aliases": sorted(item["aliases"]),
+            "phones": sorted(item["phones"]),
+            "emails": sorted(item["emails"])
